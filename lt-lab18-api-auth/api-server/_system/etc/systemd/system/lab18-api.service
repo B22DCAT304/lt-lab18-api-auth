@@ -1,0 +1,13 @@
+[Unit]
+Description=LAB18 API Authentication Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+ExecStart=/usr/bin/python3 /usr/local/bin/lab18-api-server
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,61 @@
+#!/usr/bin/python3
+import sys
+import http.client
+from pathlib import Path
+
+IP = "172.31.68.40"
+PORT = 8081
+OUT = Path.home() / "lab18" / "results.log"
+
+TESTS = {
+    "health": ("/health", None, 200,
+               "LAB18_API_HEALTHY", "LAB18_HEALTH_PASS"),
+    "missing": ("/profile", None, 401,
+                "LAB18_UNAUTHORIZED", "LAB18_MISSING_TOKEN_PASS"),
+    "invalid": ("/profile", "invalid-token", 401,
+                "LAB18_UNAUTHORIZED", "LAB18_INVALID_TOKEN_PASS"),
+    "user": ("/profile", "lab18-user-demo", 200,
+             "LAB18_PROFILE_OK", "LAB18_USER_PASS"),
+    "forbidden": ("/admin", "lab18-user-demo", 403,
+                  "LAB18_FORBIDDEN", "LAB18_FORBIDDEN_PASS"),
+    "admin": ("/admin", "lab18-admin-demo", 200,
+              "LAB18_ADMIN_OK", "LAB18_ADMIN_PASS")
+}
+
+def run(mode):
+    path, token, expected, message, marker = TESTS[mode]
+    headers = {}
+    if token is not None:
+        headers["Authorization"] = "Bearer " + token
+
+    conn = http.client.HTTPConnection(IP, PORT, timeout=5)
+    try:
+        conn.request("GET", path, headers=headers)
+        response = conn.getresponse()
+        status = response.status
+        received = dict(response.getheaders())
+        body = response.read().decode()
+    finally:
+        conn.close()
+
+    print("HTTP", status, body.strip())
+    assert status == expected
+    assert message in body
+
+    if status == 401:
+        assert received.get("WWW-Authenticate") == "Bearer"
+
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    with OUT.open("a") as f:
+        f.write(marker + "\n")
+    print(marker)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2 or sys.argv[1] not in TESTS:
+        print("Usage: lab18-check health|missing|invalid|user|forbidden|admin")
+        sys.exit(2)
+    try:
+        run(sys.argv[1])
+    except Exception as e:
+        print("LAB18_CHECK_FAIL:", e)
+        sys.exit(1)
